@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use instructions::initialize::*;
+use instructions::deposit::*;
 
 pub mod instructions;
 
@@ -12,6 +13,11 @@ pub mod escrow {
 
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         msg!("Greetings from: {:?}", ctx.program_id);
+        Ok(())
+    }
+
+    pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
+        ctx.accounts.deposit(amount)?;
         Ok(())
     }
 }

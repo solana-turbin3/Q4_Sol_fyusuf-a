@@ -4,8 +4,7 @@ use anchor_lang::prelude::*;
 pub struct Initialize<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    #[account()]
-    pub payee: UncheckedAccount<'info>,
+    pub payee: SystemAccount<'info>,
     #[account(
         init,
         payer = payer,
@@ -28,7 +27,9 @@ impl Space for VaultState {
 
 impl<'info> Initialize<'info> {
     pub fn initialize(&mut self, bumps: &InitializeBumps) -> Result<()> {
-        self.vault_state.state_bump = bumps.vault_state;
+        self.vault_state.set_inner(VaultState {
+            state_bump: bumps.vault_state,
+        });
         Ok(())
     }
 }
