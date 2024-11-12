@@ -27,7 +27,8 @@ pub mod anchor_marketplace {
     pub fn purchase(ctx: Context<Purchase>) -> Result<()> {
         ctx.accounts.send_sol()?;
         ctx.accounts.send_nft()?;
-        ctx.accounts.close_mint_vault()
+        ctx.accounts.close_mint_vault()?;
+        ctx.accounts.reward_maker()
     }
 
     pub fn delist(ctx: Context<Delist>) -> Result<()> {

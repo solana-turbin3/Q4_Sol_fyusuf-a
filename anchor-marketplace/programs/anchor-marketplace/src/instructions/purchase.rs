@@ -60,6 +60,14 @@ pub struct Purchase<'info> {
     )]
     pub rewards_mint: InterfaceAccount<'info, Mint>,
 
+    #[account(
+        init_if_needed,
+        payer = taker,
+        associated_token_program::mint = rewards_mint,
+        associated_token_program::authority = maker,
+    )]
+    pub rewards_ata: InterfaceAccount<'info, TokenAccount>,
+
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub token_program: Interface<'info, TokenInterface>,
     pub system_program: Program<'info, System>,
@@ -118,6 +126,27 @@ impl<'info> Purchase<'info> {
         let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
 
         transfer_checked(cpi_ctx, 1, self.maker_mint.decimals)
+    }
+
+    pub fn reward_maker(&mut self) -> Result<()> {
+        let cpi_program = self.token_program.to_account_info();
+
+        let seeds = &[
+            b"rewards",
+            marketplace.key().as_ref()
+        ];
+        let signer_seeds = &[&seeds[..]];
+
+        let cpi_accounts = MintTo {
+            mint: self.rewards_mint.to_account_info(),
+            to: self.maker.to_account_info(),
+            authority: self.maker.to_account_info()
+        };
+
+        let cpi_context = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
+
+        mint_to(cpi_context, 10_u64.pow(self.rewards_mint.decimals as u32))?;
+        Ok(())
     }
 
     pub fn close_mint_vault(&mut self) -> Result<()> {
