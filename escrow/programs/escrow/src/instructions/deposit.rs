@@ -5,10 +5,10 @@ use crate::VaultState;
 #[derive(Accounts)]
 pub struct Deposit<'info> {
     #[account(mut)]
-    pub user: Signer<'info>,
+    pub payer: Signer<'info>,
     pub payee: SystemAccount<'info>,
     #[account(
-        seeds = [b"state", user.key().as_ref(), payee.key().as_ref()],
+        seeds = [b"state", payer.key().as_ref(), payee.key().as_ref()],
         bump = vault_state.state_bump,
     )]
     pub vault_state: Account<'info, VaultState>,
@@ -19,7 +19,7 @@ impl<'info> Deposit<'info> {
     pub fn deposit(&mut self, amount: u64) -> Result<()> {
         let cpi_program = self.system_program.to_account_info();
         let cpi_accounts = Transfer {
-            from: self.user.to_account_info(),
+            from: self.payer.to_account_info(),
             to: self.vault_state.to_account_info(),
         };
         let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
