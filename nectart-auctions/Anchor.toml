@@ -5,7 +5,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-nectart_auctions = "9KGS7ihVcXQkyyFtULxZjs7mJu8AySZednB7Q7iYLKUe"
+nectart_auctions = "4zoHXad7ksVtaDgP2YqgCzx8DErSiXgDVsLBaodHpHuh"
 
 [registry]
 url = "https://api.apr.dev"
