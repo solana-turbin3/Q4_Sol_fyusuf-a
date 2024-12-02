@@ -1,30 +1,8 @@
 use anchor_lang::{prelude::*, system_program::{Transfer, transfer}};
-use anchor_spl::{
-    metadata::{
-        mpl_token_metadata::instructions::{
-            FreezeDelegatedAccountCpi, FreezeDelegatedAccountCpiAccounts
-        }, 
-        MasterEditionAccount, 
-        Metadata
-    }, 
-    token::{
-        Mint, Token, TokenAccount
-    }
-};
+use anchor_spl::token::Mint;
 
 use crate::state::{Auction, Vault};
-
-#[error_code]
-enum BidError {
-    #[msg("Auction has not started")]
-    AuctionNotStarted,
-    #[msg("Auction has ended")]
-    AuctionEnded,
-    #[msg("Bid is too low")]
-    BidTooLow,
-    #[msg("Preceding bidder is incorrect")]
-    NotPrecedingBidder,
-}
+use crate::errors::AuctionError;
 
 #[derive(Accounts)]
 pub struct Bid<'info> {
@@ -41,29 +19,28 @@ pub struct Bid<'info> {
         bump = auction_vault.bump,
     )]
     pub auction_vault: Account<'info, Vault>,
-    pub preceding_bidder: AccountInfo<'info>,
+    /// The account of the preceding bidder. A check is made to ensure its public key is the right
+    /// one.
+    pub preceding_bidder: Option<AccountInfo<'info>>,
     pub system_program: Program<'info, System>,
 }
 
 impl<'info> Bid<'info> {
     pub fn bid(&mut self, lamports: u64) -> Result<()> {
         let time_elapsed = Clock::get()?.unix_timestamp - self.auction.start_time;
-        require!(time_elapsed >= 0, BidError::AuctionNotStarted);
-        require!(time_elapsed < self.auction.deadline, BidError::AuctionEnded);
+        require!(time_elapsed >= 0, AuctionError::AuctionNotStarted);
+        require!(time_elapsed < self.auction.deadline, AuctionError::AuctionEnded);
         let current_bid = self.auction.current_bid.unwrap_or(0);
         let min_increment = self.auction.min_increment.unwrap_or(0);
-        require!(lamports > current_bid + min_increment, BidError::BidTooLow);
+        require!(lamports > current_bid + min_increment, AuctionError::BidTooLow);
         
+        require!(self.auction.current_bidder == self.preceding_bidder.clone().map(|x| x.key()), AuctionError::BadPrecedingBidder);
         if self.auction.current_bidder.is_some() {
-            require!(
-                self.auction.current_bidder.unwrap() != self.preceding_bidder.key(),
-                BidError::BidTooLow,
-            );
             let cpi_ctx = CpiContext::new(
                 self.system_program.to_account_info(),
                 Transfer {
                     from: self.auction_vault.to_account_info(),
-                    to: self.preceding_bidder.to_account_info(),
+                    to: self.preceding_bidder.clone().unwrap(),
                 },
             );
             transfer(cpi_ctx, current_bid)?;
@@ -81,4 +58,3 @@ impl<'info> Bid<'info> {
         Ok(())
     }
 }
-
