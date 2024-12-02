@@ -30,10 +30,11 @@ impl<'info> Bid<'info> {
         let time_elapsed = Clock::get()?.unix_timestamp - self.auction.start_time;
         require!(time_elapsed >= 0, AuctionError::AuctionNotStarted);
         require!(time_elapsed < self.auction.deadline, AuctionError::AuctionEnded);
-        let current_bid = self.auction.current_bid.unwrap_or(0);
-        let min_increment = self.auction.min_increment.unwrap_or(0);
-        require!(lamports > current_bid + min_increment, AuctionError::BidTooLow);
-        
+        let minimum = match self.auction.current_bid {
+            Some(current_bid) => current_bid + self.auction.min_increment.unwrap_or(0),
+            None => self.auction.min_price,
+        };
+        require!(lamports > minimum, AuctionError::BidTooLow);
         require!(self.auction.current_bidder == self.preceding_bidder.clone().map(|x| x.key()), AuctionError::BadPrecedingBidder);
         if self.auction.current_bidder.is_some() {
             let cpi_ctx = CpiContext::new(
@@ -43,6 +44,7 @@ impl<'info> Bid<'info> {
                     to: self.preceding_bidder.clone().unwrap(),
                 },
             );
+            let current_bid = self.auction.current_bid.unwrap();
             transfer(cpi_ctx, current_bid)?;
             let cpi_ctx = CpiContext::new(
                 self.system_program.to_account_info(),
