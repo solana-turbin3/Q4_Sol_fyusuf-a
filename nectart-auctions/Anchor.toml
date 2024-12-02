@@ -17,6 +17,12 @@ wallet = "~/.config/solana/id.json"
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
 
-[[test.genesis]]
+
+[test.validator]
+url = "https://api.mainnet-beta.solana.com"
+
+[[test.validator.clone]]
 address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
-program = "./downloaded-programs/metadata.so"
+
+[[test.validator.clone]]
+address = "SysExL2WDyJi9aRZrXorrjHJut3JwHQ7R9bTyctbNNG"
