@@ -30,4 +30,3 @@ it("stores the admin address", async () => {
   const accountInfo = await program.account.config.fetch(pda);
   expect(accountInfo.admin.equals(admin.publicKey));
 });
-
