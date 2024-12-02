@@ -3,6 +3,7 @@ import { Program, web3 } from "@coral-xyz/anchor";
 import { admin } from '../nectart-auctions';
 import { NectartAuctions } from "../../target/types/nectart_auctions";
 import { expect } from "chai";
+import { airdrop_if_needed } from "../lib";
 
 const provider = anchor.AnchorProvider.env();
 anchor.setProvider(provider);
@@ -10,12 +11,8 @@ anchor.setProvider(provider);
 const program = anchor.workspace.NectartAuctions as Program<NectartAuctions>;
 
 it("sucessfully initializes the program", async () => {
-  let balance = await provider.connection.getBalance(admin.publicKey);
-  if (balance === 0) {
-    const signature = await provider.connection.requestAirdrop(admin.publicKey, web3.LAMPORTS_PER_SOL);
-    await provider.connection.confirmTransaction(signature, "finalized");
-  }
-  const tx = await program.methods.initialize()
+  await airdrop_if_needed(provider, admin.publicKey, 5);
+  await program.methods.initialize()
     .accounts({
       admin: admin.publicKey
     })

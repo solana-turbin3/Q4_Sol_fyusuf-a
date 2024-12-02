@@ -4,7 +4,7 @@ import { auctioneer } from "../nectart-auctions";
 import { keypairIdentity } from "@metaplex-foundation/umi";
 import { mplTokenMetadata } from "@metaplex-foundation/mpl-token-metadata";
 import { mockStorage } from '@metaplex-foundation/umi-storage-mock';
-import { mintNft, nftDetail, uploadImage, uploadMetadata } from '../lib';
+import { airdrop_if_needed, mintNft, nftDetail, uploadImage, uploadMetadata } from '../lib';
 
 const provider = anchor.AnchorProvider.env();
 const umi = createUmi(provider.connection);
@@ -15,9 +15,8 @@ umi.use(mockStorage());
 anchor.setProvider(provider);
 
 it("mints nft", async () => {
+  await airdrop_if_needed(provider, auctioneer.publicKey, 5);
   const imageUri = await uploadImage(umi, nftDetail);
-  console.log(`Image URI: ${imageUri}`);
   const metadataUri = await uploadMetadata(umi, nftDetail, imageUri);
-  console.log(`Metadata URI: ${metadataUri}`);
   await mintNft(umi, metadataUri);
 });

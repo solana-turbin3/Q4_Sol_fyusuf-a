@@ -1,8 +1,10 @@
 import fs from 'fs';
-import { createGenericFile } from "@metaplex-foundation/umi";
+import { createGenericFile, KeypairSigner } from "@metaplex-foundation/umi";
 import type { Umi } from "@metaplex-foundation/umi";
 import { createNft } from "@metaplex-foundation/mpl-token-metadata";
-import { amountToString, generateSigner, percentAmount, sol } from "@metaplex-foundation/umi";
+import { generateSigner, percentAmount } from "@metaplex-foundation/umi";
+import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
+import { AnchorProvider } from "@coral-xyz/anchor";
 
 type NFTDetail = {
   name: string;
@@ -41,7 +43,6 @@ export async function uploadMetadata(umi: Umi, nftDetail: NFTDetail, imageUri: s
       },
     };
     const metadataUri = await umi.uploader.uploadJson(metadata);
-    console.log(`Uploaded metadata: ${metadataUri}`);
     return metadataUri;
   } catch (e) {
     throw e;
@@ -64,20 +65,16 @@ export async function uploadImage(umi: Umi, nftDetail: NFTDetail): Promise<strin
       }
     );
     const [imgUri] = await umi.uploader.upload([image]);
-    console.log(`Uploaded image: ${imgUri}`);
     return imgUri;
   } catch (error) {
     throw error;
   }
 }
 
-export async function mintNft(umi: Umi, metadataUri: string) {
+export async function mintNft(umi: Umi, metadataUri: string): Promise<KeypairSigner> {
   const publicKey = umi.identity.publicKey;
   try {
     const mint = generateSigner(umi);
-    await umi.rpc.airdrop(publicKey, sol(5));
-    const balance = await umi.rpc.getBalance(publicKey);
-    console.log(`Mint: ${amountToString(balance)}`);
     await createNft(umi, {
       mint,
       name: 'NFT',
@@ -86,9 +83,16 @@ export async function mintNft(umi: Umi, metadataUri: string) {
       sellerFeeBasisPoints: percentAmount(0),
       creators: [{ address: publicKey, verified: true, share: 100 }],
     }).sendAndConfirm(umi);
-    console.log(`Created NFT: ${mint.publicKey.toString()}`);
+    return mint;
   } catch (error) {
     throw error;
   }
 }
 
+export async function airdrop_if_needed(provider: AnchorProvider, publicKey: PublicKey, amount: number) {
+  const balance = await provider.connection.getBalance(publicKey);
+  if (balance === 0) {
+    const signature = await provider.connection.requestAirdrop(publicKey, amount * LAMPORTS_PER_SOL);
+    await provider.connection.confirmTransaction(signature, "finalized");
+  }
+}
