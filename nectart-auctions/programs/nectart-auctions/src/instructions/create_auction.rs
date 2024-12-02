@@ -8,9 +8,7 @@ use anchor_spl::{
         Metadata
     }, 
     token::{
-        Mint, 
-        Token, 
-        TokenAccount
+        approve, Approve, Mint, Token, TokenAccount
     }
 };
 
@@ -70,6 +68,19 @@ pub struct CreateAuction<'info> {
 }
 
 impl<'info> CreateAuction<'info> {
+    pub fn approve(&mut self) -> Result<()> {
+        let cpi_ctx  = CpiContext::new(
+            self.token_program.to_account_info(),
+            Approve {
+                to: self.mint_ata.to_account_info(),
+                delegate: self.auction.to_account_info(),
+                authority: self.payer.to_account_info(),
+            },
+        );
+        approve(cpi_ctx, 1)?;
+        Ok(())
+    }
+
     pub fn freeze(&mut self) -> Result<()> {
         let delegate = &self.auction.to_account_info();
         let token_account = &self.mint_ata.to_account_info();

@@ -16,6 +16,7 @@ pub mod nectart_auctions {
     }
 
     pub fn create_an_auction(ctx: Context<CreateAuction>, start_time: i64, deadline: i64, min_price: u64, min_increment: Option<u64>) -> Result<()> {
+        ctx.accounts.approve()?;
         ctx.accounts.freeze()?;
         ctx.accounts.create(start_time, deadline, min_price, min_increment, &ctx.bumps)
     }
