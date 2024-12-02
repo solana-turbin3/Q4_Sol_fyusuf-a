@@ -14,4 +14,6 @@ pub enum AuctionError {
     NotMaker,
     #[msg("Preceding bidder is not correct")]
     BadPrecedingBidder,
+    #[msg("Bad signer")]
+    BadSigner,
 }
