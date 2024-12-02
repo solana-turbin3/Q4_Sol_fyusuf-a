@@ -60,13 +60,13 @@ impl<'info> ClaimNFT<'info> {
             Some(bidder) => {
                 require!(
                     self.signer.to_account_info().key() == bidder,
-                    AuctionError::BadSigner,
+                    AuctionError::BadAccount,
                 );
             }
             None => {
                 require!(
                     self.signer.to_account_info().key() == self.auction.maker,
-                    AuctionError::BadSigner,
+                    AuctionError::BadAccount,
                 );
             }
         }

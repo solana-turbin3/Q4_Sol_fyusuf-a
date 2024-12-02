@@ -10,10 +10,8 @@ pub enum AuctionError {
     AuctionNotEnded,
     #[msg("Bid is too low")]
     BidTooLow,
-    #[msg("Only the maker can claim the funds")]
-    NotMaker,
     #[msg("Preceding bidder is not correct")]
     BadPrecedingBidder,
-    #[msg("Bad signer")]
-    BadSigner,
+    #[msg("Bad account")]
+    BadAccount,
 }

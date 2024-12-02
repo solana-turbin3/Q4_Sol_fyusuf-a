@@ -7,7 +7,7 @@ use crate::errors::AuctionError;
 #[derive(Accounts)]
 pub struct ClaimSol<'info> {
     #[account(mut)]
-    pub maker: Signer<'info>,
+    pub signer: Signer<'info>,
     pub mint: Account<'info, Mint>,
     #[account(
         seeds = [b"auction", mint.key().as_ref()],
@@ -24,8 +24,8 @@ pub struct ClaimSol<'info> {
 
 impl<'info> ClaimSol<'info> {
     pub fn claim_sol(&mut self) -> Result<()> {
-        let maker_key = self.maker.key();
-        require!(maker_key == self.auction.maker, AuctionError::NotMaker);
+        let maker_key = self.signer.key();
+        require!(maker_key == self.auction.maker, AuctionError::BadAccount);
         let time_elapsed = Clock::get()?.unix_timestamp - self.auction.start_time;
         require!(time_elapsed >= self.auction.deadline, AuctionError::AuctionNotEnded);
         let current_bid = self.auction.current_bid.unwrap_or(0);
@@ -34,7 +34,7 @@ impl<'info> ClaimSol<'info> {
                 self.system_program.to_account_info(),
                 Transfer {
                     from: self.auction_vault.to_account_info(),
-                    to: self.maker.to_account_info(),
+                    to: self.signer.to_account_info(),
                 },
             );
             transfer(cpi_ctx, current_bid)?;
