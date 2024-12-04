@@ -5,7 +5,8 @@ use anchor_spl::{
             FreezeDelegatedAccountCpi, FreezeDelegatedAccountCpiAccounts
         }, 
         MasterEditionAccount, 
-        Metadata
+        Metadata,
+        MetadataAccount
     }, 
     token::{
         approve, Approve, Mint, Token, TokenAccount
@@ -26,15 +27,18 @@ pub struct CreateAuction<'info> {
         associated_token::authority = payer,
     )]
     pub mint_ata: Account<'info, TokenAccount>,
-    //#[account(
-        //seeds = [
-            //b"metadata",
-            //metadata.key().as_ref(),
-            //b"edition",
-            //edition.key().as_ref(),
-        //],
-    //)]
-    //pub metadata: Account<'info, MetadataAccount>,
+    #[account(
+        seeds = [
+            b"metadata",
+            metadata_program.key().as_ref(),
+            mint.key().as_ref(),
+        ],
+        seeds::program = metadata_program.key(),
+        bump,
+        constraint = metadata.collection.as_ref().unwrap().key.as_ref() == collection_mint.key().as_ref(),
+        constraint = metadata.collection.as_ref().unwrap().verified == true,
+    )]
+    pub metadata: Account<'info, MetadataAccount>,
     #[account(
         seeds = [
             b"metadata",
@@ -89,6 +93,13 @@ impl<'info> CreateAuction<'info> {
         let token_program = &self.token_program.to_account_info();
         let metadata_program = &self.metadata_program.to_account_info();
 
+        let seeds = &[
+            b"auction",
+            self.mint.to_account_info().key.as_ref(),
+            &[self.auction.bump],
+        ];
+        let signer_seeds = &[&seeds[..]];
+
         FreezeDelegatedAccountCpi::new(
             metadata_program,
             FreezeDelegatedAccountCpiAccounts {
@@ -98,7 +109,7 @@ impl<'info> CreateAuction<'info> {
                 mint,
                 token_program,
             },
-        ).invoke()?;
+        ).invoke_signed(signer_seeds)?;
         Ok(())
     }
 

@@ -1,10 +1,13 @@
 import fs from 'fs';
 import { createGenericFile, KeypairSigner } from "@metaplex-foundation/umi";
 import type { Umi } from "@metaplex-foundation/umi";
-import { createNft } from "@metaplex-foundation/mpl-token-metadata";
-import { generateSigner, percentAmount } from "@metaplex-foundation/umi";
+import { generateSigner } from "@metaplex-foundation/umi";
 import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { AnchorProvider } from "@coral-xyz/anchor";
+import { createMint, createToken, mintTokensTo } from '@metaplex-foundation/mpl-toolbox';
+
+export const ONE_SECOND = 1000;
+export const ONE_MINUTE = ONE_SECOND * 60;
 
 type NFTDetail = {
   name: string;
@@ -71,20 +74,27 @@ export async function uploadImage(umi: Umi, nftDetail: NFTDetail): Promise<strin
   }
 }
 
-export async function mintNft(umi: Umi, metadataUri: string): Promise<KeypairSigner> {
+export async function mintNft(umi: Umi): Promise<KeypairSigner> {
   const publicKey = umi.identity.publicKey;
   try {
     const mint = generateSigner(umi);
-    await createNft(umi, {
+    await createMint(umi, {
       mint,
-      name: 'NFT',
-      symbol: 'NFT',
-      uri: metadataUri,
-      sellerFeeBasisPoints: percentAmount(0),
-      creators: [{ address: publicKey, verified: true, share: 100 }],
+      decimals: 0,
+      mintAuthority: umi.identity.publicKey,
+      freezeAuthority: umi.identity.publicKey,
+    }).sendAndConfirm(umi);
+    const token = generateSigner(umi);
+    await createToken(umi, { token, mint: mint.publicKey, owner: publicKey }).sendAndConfirm(umi);
+    await mintTokensTo(umi, {
+      mintAuthority: umi.identity,
+      mint: mint.publicKey,
+      amount: 1,
+      token: token.publicKey,
     }).sendAndConfirm(umi);
     return mint;
   } catch (error) {
+    console.log(error);
     throw error;
   }
 }
