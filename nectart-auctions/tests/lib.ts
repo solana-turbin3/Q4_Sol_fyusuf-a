@@ -1,10 +1,11 @@
 import fs from 'fs';
-import { createGenericFile, KeypairSigner } from "@metaplex-foundation/umi";
+import { createGenericFile, KeypairSigner, percentAmount } from "@metaplex-foundation/umi";
 import type { Umi } from "@metaplex-foundation/umi";
 import { generateSigner } from "@metaplex-foundation/umi";
 import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { AnchorProvider } from "@coral-xyz/anchor";
-import { createMint, createToken, mintTokensTo } from '@metaplex-foundation/mpl-toolbox';
+import { createNft as metaplexCreateNft } from "@metaplex-foundation/mpl-token-metadata";
+import { findMasterEditionPda, findMetadataPda, verifySizedCollectionItem } from "@metaplex-foundation/mpl-token-metadata";
 
 export const ONE_SECOND = 1000;
 export const ONE_MINUTE = ONE_SECOND * 60;
@@ -74,25 +75,52 @@ export async function uploadImage(umi: Umi, nftDetail: NFTDetail): Promise<strin
   }
 }
 
-export async function mintNft(umi: Umi): Promise<KeypairSigner> {
-  const publicKey = umi.identity.publicKey;
+export async function createNft(umi: Umi): Promise<{
+  collectionMint: KeypairSigner,
+  nftMint: KeypairSigner
+}> {
   try {
-    const mint = generateSigner(umi);
-    await createMint(umi, {
-      mint,
-      decimals: 0,
-      mintAuthority: umi.identity.publicKey,
-      freezeAuthority: umi.identity.publicKey,
+    const collectionMint = generateSigner(umi);
+    // creates a collection mint
+    await metaplexCreateNft(umi, {
+        mint: collectionMint,
+        name: "GM",
+        symbol: "GM",
+        uri: "https://arweave.net/123",
+        sellerFeeBasisPoints: percentAmount(5.5),
+        creators: null,
+        collectionDetails: { 
+          __kind: 'V1', size: 10,
+        }
+    }).sendAndConfirm(umi)
+
+    // creates an NFT
+    const nftMint = generateSigner(umi);
+    await metaplexCreateNft(umi, {
+      mint: nftMint,
+      name: "GM",
+      symbol: "GM",
+      uri: "https://arweave.net/123",
+      sellerFeeBasisPoints: percentAmount(5.5),
+      collection: {verified: false, key: collectionMint.publicKey},
+      creators: null,
     }).sendAndConfirm(umi);
-    const token = generateSigner(umi);
-    await createToken(umi, { token, mint: mint.publicKey, owner: publicKey }).sendAndConfirm(umi);
-    await mintTokensTo(umi, {
-      mintAuthority: umi.identity,
-      mint: mint.publicKey,
-      amount: 1,
-      token: token.publicKey,
-    }).sendAndConfirm(umi);
-    return mint;
+
+    // verifies metadata
+    const collectionMetadata = findMetadataPda(umi, {mint: collectionMint.publicKey});
+    const collectionMasterEdition = findMasterEditionPda(umi, {mint: collectionMint.publicKey});
+    const nftMetadata = findMetadataPda(umi, {mint: nftMint.publicKey});
+    await verifySizedCollectionItem(umi, {
+      metadata: nftMetadata,
+      collectionAuthority: umi.identity,
+      collectionMint: collectionMint.publicKey,
+      collection: collectionMetadata,
+      collectionMasterEditionAccount: collectionMasterEdition,
+     }).sendAndConfirm(umi)
+    return {
+      collectionMint,
+      nftMint,
+    };
   } catch (error) {
     console.log(error);
     throw error;
