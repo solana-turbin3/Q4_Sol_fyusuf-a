@@ -40,7 +40,7 @@ impl<'info> Bid<'info> {
         require!(time_elapsed >= 0, AuctionError::AuctionNotStarted);
         require!(current_time < self.auction.deadline, AuctionError::AuctionEnded);
         let minimum = match self.auction.current_bid {
-            Some(current_bid) => current_bid + self.auction.min_increment.unwrap_or(0),
+            Some(current_bid) => current_bid + self.auction.min_increment,
             None => self.auction.min_price,
         };
         require!(lamports > minimum, AuctionError::BidTooLow);

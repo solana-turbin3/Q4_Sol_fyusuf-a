@@ -120,7 +120,7 @@ impl<'info> CreateAuction<'info> {
         Ok(())
     }
 
-    pub fn create(&mut self, start_time: i64, deadline: i64, min_price: u64, min_increment: Option<u64>, bumps: &CreateAuctionBumps) -> Result<()> {
+    pub fn create(&mut self, start_time: i64, deadline: i64, min_price: u64, min_increment: u64, bumps: &CreateAuctionBumps) -> Result<()> {
         self.auction.set_inner(Auction {
             start_time,
             deadline,

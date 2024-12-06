@@ -8,7 +8,7 @@ pub struct Auction {
     pub min_price: u64,
     pub current_bidder: Option<Pubkey>,
     pub current_bid: Option<u64>,
-    pub min_increment: Option<u64>,
+    pub min_increment: u64,
     pub mint: Pubkey,
     pub maker: Pubkey,
     pub bump: u8,
