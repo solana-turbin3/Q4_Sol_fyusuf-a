@@ -1,7 +1,7 @@
-use anchor_lang::{prelude::*, system_program::{Transfer, transfer}};
+use anchor_lang::{prelude::*, system_program::{transfer, Transfer}};
 use anchor_spl::token::Mint;
 
-use crate::state::{Auction, Vault};
+use crate::state::{Auction, VaultState};
 use crate::errors::AuctionError;
 
 #[derive(Accounts)]
@@ -10,17 +10,25 @@ pub struct Bid<'info> {
     pub bidder: Signer<'info>,
     pub mint: Account<'info, Mint>,
     #[account(
+        mut,
         seeds = [b"auction", mint.key().as_ref()],
         bump = auction.bump,
     )]
     pub auction: Account<'info, Auction>,
     #[account(
+        mut,
         seeds = [b"vault", mint.key().as_ref()],
-        bump = auction_vault.bump,
+        bump = vault_state.vault_bump,
     )]
-    pub auction_vault: Account<'info, Vault>,
+    pub vault: SystemAccount<'info>,
+    #[account(
+        seeds = [b"state", mint.key().as_ref()],
+        bump = vault_state.state_bump,
+    )]
+    pub vault_state: Account<'info, VaultState>,
     /// The account of the preceding bidder. A check is made to ensure its public key is the right
     /// one.
+    #[account(mut)]
     pub preceding_bidder: Option<AccountInfo<'info>>,
     pub system_program: Program<'info, System>,
 }
@@ -37,24 +45,31 @@ impl<'info> Bid<'info> {
         require!(lamports > minimum, AuctionError::BidTooLow);
         require!(self.auction.current_bidder == self.preceding_bidder.clone().map(|x| x.key()), AuctionError::BadPrecedingBidder);
         if self.auction.current_bidder.is_some() {
-            let cpi_ctx = CpiContext::new(
+            let seeds = [
+                b"vault",
+                self.mint.to_account_info().key.as_ref(),
+                &[self.vault_state.vault_bump],
+            ];
+            let signer_seeds = &[&seeds[..]];
+            let cpi_ctx = CpiContext::new_with_signer(
                 self.system_program.to_account_info(),
                 Transfer {
-                    from: self.auction_vault.to_account_info(),
+                    from: self.vault.to_account_info(),
                     to: self.preceding_bidder.clone().unwrap(),
                 },
+                signer_seeds,
             );
             let current_bid = self.auction.current_bid.unwrap();
             transfer(cpi_ctx, current_bid)?;
-            let cpi_ctx = CpiContext::new(
-                self.system_program.to_account_info(),
-                Transfer {
-                    from: self.bidder.to_account_info(),
-                    to: self.auction_vault.to_account_info(),
-                },
-            );
-            transfer(cpi_ctx, lamports)?;
         }
+        let cpi_ctx = CpiContext::new(
+            self.system_program.to_account_info(),
+            Transfer {
+                from: self.bidder.to_account_info(),
+                to: self.vault.to_account_info(),
+            },
+        );
+        transfer(cpi_ctx, lamports)?;
         self.auction.current_bid = Some(lamports);
         self.auction.current_bidder = Some(*self.bidder.key);
         Ok(())

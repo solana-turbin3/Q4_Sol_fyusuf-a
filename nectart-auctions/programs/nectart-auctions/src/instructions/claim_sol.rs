@@ -1,7 +1,7 @@
 use anchor_lang::{prelude::*, system_program::{Transfer, transfer}};
 use anchor_spl::token::Mint;
 
-use crate::state::{Auction, Vault};
+use crate::state::{Auction, VaultState};
 use crate::errors::AuctionError;
 
 #[derive(Accounts)]
@@ -16,9 +16,14 @@ pub struct ClaimSol<'info> {
     pub auction: Account<'info, Auction>,
     #[account(
         seeds = [b"vault", mint.key().as_ref()],
-        bump = auction_vault.bump,
+        bump = vault_state.vault_bump,
     )]
-    pub auction_vault: Account<'info, Vault>,
+    pub vault: SystemAccount<'info>,
+    #[account(
+        seeds = [b"state", mint.key().as_ref()],
+        bump = vault_state.state_bump,
+    )]
+    pub vault_state: Account<'info, VaultState>,
     pub system_program: Program<'info, System>,
 }
 
@@ -33,7 +38,7 @@ impl<'info> ClaimSol<'info> {
             let cpi_ctx = CpiContext::new(
                 self.system_program.to_account_info(),
                 Transfer {
-                    from: self.auction_vault.to_account_info(),
+                    from: self.vault.to_account_info(),
                     to: self.signer.to_account_info(),
                 },
             );

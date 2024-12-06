@@ -1,4 +1,4 @@
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, system_program::{transfer, Transfer}};
 use anchor_spl::{
     metadata::{
         mpl_token_metadata::instructions::{
@@ -12,8 +12,9 @@ use anchor_spl::{
         approve, Approve, Mint, Token, TokenAccount
     }
 };
+use solana_program::sysvar::rent::Rent;
 
-use crate::state::{Auction, Vault};
+use crate::state::{Auction, VaultState};
 
 #[derive(Accounts)]
 pub struct CreateAuction<'info> {
@@ -59,13 +60,19 @@ pub struct CreateAuction<'info> {
     )]
     pub auction: Account<'info, Auction>,
     #[account(
-        init,
-        payer = payer,
+        mut,
         seeds = [b"vault", mint.key().as_ref()],
-        space = 8 + Vault::INIT_SPACE,
         bump,
     )]
-    pub auction_vault: Account<'info, Vault>,
+    pub vault: SystemAccount<'info>,
+    #[account(
+        init,
+        payer = payer,
+        seeds = [b"state", mint.key().as_ref()],
+        space = 8 + VaultState::INIT_SPACE,
+        bump,
+    )]
+    pub vault_state: Account<'info, VaultState>,
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
     pub metadata_program: Program<'info, Metadata>,
@@ -125,6 +132,16 @@ impl<'info> CreateAuction<'info> {
             maker: self.payer.key(),
             bump: bumps.auction,
         });
+        self.vault_state.vault_bump = bumps.vault;
+        self.vault_state.state_bump = bumps.vault_state;
+        let cpi_ctx = CpiContext::new(
+            self.system_program.to_account_info(),
+            Transfer {
+                from: self.payer.to_account_info(),
+                to: self.vault.to_account_info(),
+            },
+        );
+        transfer(cpi_ctx, Rent::get()?.minimum_balance(0))?;
         Ok(())
     }
 }
