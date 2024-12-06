@@ -7,6 +7,9 @@ skip-lint = false
 [programs.localnet]
 nectart_auctions = "4zoHXad7ksVtaDgP2YqgCzx8DErSiXgDVsLBaodHpHuh"
 
+[programs.devnet]
+nectart_auctions = "4zoHXad7ksVtaDgP2YqgCzx8DErSiXgDVsLBaodHpHuh"
+
 [registry]
 url = "https://api.apr.dev"
 
