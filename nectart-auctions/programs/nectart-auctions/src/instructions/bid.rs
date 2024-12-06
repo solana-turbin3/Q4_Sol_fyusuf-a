@@ -35,9 +35,10 @@ pub struct Bid<'info> {
 
 impl<'info> Bid<'info> {
     pub fn bid(&mut self, lamports: u64) -> Result<()> {
-        let time_elapsed = Clock::get()?.unix_timestamp - self.auction.start_time;
+        let current_time = Clock::get()?.unix_timestamp;
+        let time_elapsed = current_time - self.auction.start_time;
         require!(time_elapsed >= 0, AuctionError::AuctionNotStarted);
-        require!(time_elapsed < self.auction.deadline, AuctionError::AuctionEnded);
+        require!(current_time < self.auction.deadline, AuctionError::AuctionEnded);
         let minimum = match self.auction.current_bid {
             Some(current_bid) => current_bid + self.auction.min_increment.unwrap_or(0),
             None => self.auction.min_price,

@@ -60,9 +60,7 @@ before(async () => {
 
   await airdrop_if_needed(provider, toWeb3JsPublicKey(bidder1.publicKey), 5);
   await airdrop_if_needed(provider, toWeb3JsPublicKey(bidder2.publicKey), 5);
-});
 
-it("Creates an auction", async () => {
   const mintAta = getAssociatedTokenAddressSync(toWeb3JsPublicKey(nftMint.publicKey), toWeb3JsPublicKey(auctioneer.publicKey));
   const nftEdition = findMasterEditionPda(umi, { mint: nftMint.publicKey });
   const nftMetadata = findMetadataPda(umi, { mint: nftMint.publicKey });
@@ -86,21 +84,23 @@ it("Creates an auction", async () => {
     .rpc();
 });
 
-it("No bet can happen before the beginning of the auction", async () => {
-  umi.use(signerIdentity(bidder1));
-  await assert.rejects(async () => {
-    await program.methods.bid(new BN(1))
-      .accounts({
-        bidder: bidder1.publicKey,
-        mint: nftMint.publicKey,
-        auction,
-        vault,
-        vaultState,
-        precedingBidder: null,
-      })
-      .signers([web3JsBidder1Signer])
-      .rpc();
-  }, () => true, "Bid should fail");
+describe("Before the beginning of the auction", () => {
+  it("No bet can be made", async () => {
+    umi.use(signerIdentity(bidder1));
+    await assert.rejects(async () => {
+      await program.methods.bid(new BN(1))
+        .accounts({
+          bidder: bidder1.publicKey,
+          mint: nftMint.publicKey,
+          auction,
+          vault,
+          vaultState,
+          precedingBidder: null,
+        })
+        .signers([web3JsBidder1Signer])
+        .rpc();
+    }, () => true, "Bid should fail");
+  });
 });
 
 describe("After the beginning of the auction", () => {
@@ -160,5 +160,30 @@ describe("After the beginning of the auction", () => {
         })
         .signers([web3JsBidder2Signer])
         .rpc();
+  });
+});
+
+describe("After the end of the auction", () => {
+  before(async () => {
+    const now = new Date().getTime();
+    await new Promise((resolve) => setTimeout(resolve, auctionEnd * 1000 - now + 1500));
+  });
+
+  it("No bet can be made", async () => {
+    umi.use(signerIdentity(bidder1));
+    await assert.rejects(async () => {
+      const tx = await program.methods.bid(new BN(100))
+        .accounts({
+          bidder: bidder1.publicKey,
+          mint: nftMint.publicKey,
+          auction,
+          vault,
+          vaultState,
+          precedingBidder: bidder2.publicKey,
+        })
+        .signers([web3JsBidder1Signer])
+        .rpc();
+      console.log(tx);
+    }, () => true, "Bid should fail");
   });
 });
