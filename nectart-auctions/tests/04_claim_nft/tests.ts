@@ -2,7 +2,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import { generateSigner, KeypairSigner, Pda, signerIdentity } from "@metaplex-foundation/umi";
-import { findMasterEditionPda, findMetadataPda, mplTokenMetadata } from "@metaplex-foundation/mpl-token-metadata";
+import { findMasterEditionPda, findMetadataPda, mplTokenMetadata, TokenStandard, transferV1 } from "@metaplex-foundation/mpl-token-metadata";
 import { mockStorage } from '@metaplex-foundation/umi-storage-mock';
 import { airdrop_if_needed, createNft } from '../lib';
 import { NectartAuctions } from "../../target/types/nectart_auctions";
@@ -178,6 +178,16 @@ describe("If a bid is made,", () => {
         .signers([web3JsBidder1Signer])
         .rpc();
     });
+
+    it("After the claim, the token is not frozen", async () => {
+      await (transferV1(umi, {
+        mint: nftMint.publicKey,
+        authority: bidder1,
+        tokenOwner: bidder1.publicKey,
+        destinationOwner: somebody.publicKey,
+        tokenStandard: TokenStandard.NonFungible,
+      }).sendAndConfirm(umi));
+    });
   });
 });
 
@@ -251,6 +261,16 @@ describe("If no bid is made", () => {
         })
         .signers([web3JsAuctioneerSigner])
         .rpc();
+    });
+
+    it("After the claim, the token is not frozen", async () => {
+      await (transferV1(umi, {
+        mint: nftMint.publicKey,
+        authority: auctioneer,
+        tokenOwner: auctioneer.publicKey,
+        destinationOwner: somebody.publicKey,
+        tokenStandard: TokenStandard.NonFungible,
+      }).sendAndConfirm(umi));
     });
   });
 });
