@@ -15,6 +15,7 @@ pub struct ClaimSol<'info> {
     )]
     pub auction: Account<'info, Auction>,
     #[account(
+        mut,
         seeds = [b"vault", mint.key().as_ref()],
         bump = vault_state.vault_bump,
     )]
@@ -31,16 +32,23 @@ impl<'info> ClaimSol<'info> {
     pub fn claim_sol(&mut self) -> Result<()> {
         let maker_key = self.signer.key();
         require!(maker_key == self.auction.maker, AuctionError::BadAccount);
-        let time_elapsed = Clock::get()?.unix_timestamp - self.auction.start_time;
-        require!(time_elapsed >= self.auction.deadline, AuctionError::AuctionNotEnded);
+        let current_time = Clock::get()?.unix_timestamp;
+        require!(current_time >= self.auction.deadline, AuctionError::AuctionNotEnded);
         let current_bid = self.auction.current_bid.unwrap_or(0);
         if current_bid != 0 {
-            let cpi_ctx = CpiContext::new(
+            let seeds = [
+                b"vault",
+                self.mint.to_account_info().key.as_ref(),
+                &[self.vault_state.vault_bump],
+            ];
+            let signer_seeds = &[&seeds[..]];
+            let cpi_ctx = CpiContext::new_with_signer(
                 self.system_program.to_account_info(),
                 Transfer {
                     from: self.vault.to_account_info(),
                     to: self.signer.to_account_info(),
                 },
+                signer_seeds
             );
             transfer(cpi_ctx, current_bid)?;
         }
