@@ -10,20 +10,22 @@ anchor.setProvider(provider);
 
 const program = anchor.workspace.NectartAuctions as Program<NectartAuctions>;
 
-it("sucessfully initializes the program", async () => {
-  await airdrop_if_needed(provider, admin.publicKey, 5);
-  await program.methods.initialize()
-    .accounts({
-      admin: admin.publicKey
-    })
-    .signers([admin])
-    .rpc();
-});
+describe("Program initialization", () => {
+  it("Program sucessfully initializes", async () => {
+    await airdrop_if_needed(provider, admin.publicKey, 5);
+    await program.methods.initialize()
+      .accounts({
+        admin: admin.publicKey
+      })
+      .signers([admin])
+      .rpc();
+  });
 
-it("stores the admin address", async () => {
-  const [pda] = web3.PublicKey.findProgramAddressSync([
-    Buffer.from("config")
-  ], program.programId);
-  const accountInfo = await program.account.config.fetch(pda);
-  expect(accountInfo.admin.equals(admin.publicKey));
+  it("After initialization, the program stores the admin address", async () => {
+    const [pda] = web3.PublicKey.findProgramAddressSync([
+      Buffer.from("config")
+    ], program.programId);
+    const accountInfo = await program.account.config.fetch(pda);
+    expect(accountInfo.admin.equals(admin.publicKey));
+  });
 });

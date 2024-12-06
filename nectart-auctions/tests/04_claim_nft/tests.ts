@@ -92,7 +92,7 @@ const initializeAuction = async () => {
   await new Promise((resolve) => setTimeout(resolve, auctionStart * 1000 - now + 1500));
 }
 
-describe("If a bid is made", () => {
+describe("If a bid is made,", () => {
   before(async () => {
     await initializeAuction();
     await program.methods.bid(new BN(1))
@@ -108,8 +108,8 @@ describe("If a bid is made", () => {
       .rpc();
   });
 
-  describe("Before the end of the auction", () => {
-    it("Nobody can claim the NFT", async () => {
+  describe("before the end of the auction", () => {
+    it("nobody can claim the NFT", async () => {
       for (const signer of [
         web3JsAuctioneerSigner,
         web3JsBidder1Signer,
@@ -134,13 +134,13 @@ describe("If a bid is made", () => {
     });
   });
 
-  describe("After the end of the auction,", () => {
+  describe("after the end of the auction,", () => {
     before(async () => {
       const now = new Date().getTime();
       await new Promise((resolve) => setTimeout(resolve, auctionEnd * 1000 - now + 1500));
     });
 
-    it("Nobody can claim the NFT...", async () => {
+    it("nobody can claim the NFT...", async () => {
       for (const signer of [
         web3JsAuctioneerSigner,
         web3JsSomebodySigner
@@ -163,7 +163,7 @@ describe("If a bid is made", () => {
       }
     });
 
-    it("... except the highest bidder", async () => {
+    it("...except the highest bidder", async () => {
       await program.methods.claimNft()
         .accounts({
           signer: bidder1.publicKey,
@@ -186,8 +186,8 @@ describe("If no bid is made", () => {
     await initializeAuction();
   });
 
-  describe("Before the end of the auction", () => {
-    it("Nobody can claim the NFT", async () => {
+  describe("Before the end of the auction,", () => {
+    it("nobody can claim the NFT", async () => {
       for (const signer of [
         web3JsAuctioneerSigner,
         web3JsSomebodySigner,
@@ -217,7 +217,7 @@ describe("If no bid is made", () => {
       await new Promise((resolve) => setTimeout(resolve, auctionEnd * 1000 - now + 1500));
     });
 
-    it("Nobody can claim the NFT...", async () => {
+    it("nobody can claim the NFT...", async () => {
       for (const signer of [somebody]) {
         await assert.rejects(async () => {
           await program.methods.claimNft()
@@ -237,7 +237,7 @@ describe("If no bid is made", () => {
       }
     });
 
-    it("... except the auctioneer", async () => {
+    it("...except the auctioneer", async () => {
       await program.methods.claimNft()
         .accounts({
           signer: auctioneer.publicKey,

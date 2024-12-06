@@ -48,46 +48,71 @@ let vaultState: anchor.web3.PublicKey;
 let auctionStart: number;
 let auctionEnd: number;
 
-before(async () => {
-  umi.use(signerIdentity(auctioneer));
-  await airdrop_if_needed(provider, toWeb3JsPublicKey(auctioneer.publicKey), 5);
-  const mint  = await createNft(umi);
-  collectionMint = mint.collectionMint;
-  nftMint = mint.nftMint;
-  auction = anchor.web3.PublicKey.findProgramAddressSync([Buffer.from('auction'), toWeb3JsPublicKey(nftMint.publicKey).toBuffer()], program.programId)[0];
-  vault = anchor.web3.PublicKey.findProgramAddressSync([Buffer.from('vault'), toWeb3JsPublicKey(nftMint.publicKey).toBuffer()], program.programId)[0];
-  vaultState = anchor.web3.PublicKey.findProgramAddressSync([Buffer.from('state'), toWeb3JsPublicKey(nftMint.publicKey).toBuffer()], program.programId)[0];
+describe("Bids", () => {
+  before(async () => {
+    umi.use(signerIdentity(auctioneer));
+    await airdrop_if_needed(provider, toWeb3JsPublicKey(auctioneer.publicKey), 5);
+    const mint  = await createNft(umi);
+    collectionMint = mint.collectionMint;
+    nftMint = mint.nftMint;
+    auction = anchor.web3.PublicKey.findProgramAddressSync([Buffer.from('auction'), toWeb3JsPublicKey(nftMint.publicKey).toBuffer()], program.programId)[0];
+    vault = anchor.web3.PublicKey.findProgramAddressSync([Buffer.from('vault'), toWeb3JsPublicKey(nftMint.publicKey).toBuffer()], program.programId)[0];
+    vaultState = anchor.web3.PublicKey.findProgramAddressSync([Buffer.from('state'), toWeb3JsPublicKey(nftMint.publicKey).toBuffer()], program.programId)[0];
 
-  await airdrop_if_needed(provider, toWeb3JsPublicKey(bidder1.publicKey), 5);
-  await airdrop_if_needed(provider, toWeb3JsPublicKey(bidder2.publicKey), 5);
+    await airdrop_if_needed(provider, toWeb3JsPublicKey(bidder1.publicKey), 5);
+    await airdrop_if_needed(provider, toWeb3JsPublicKey(bidder2.publicKey), 5);
 
-  const mintAta = getAssociatedTokenAddressSync(toWeb3JsPublicKey(nftMint.publicKey), toWeb3JsPublicKey(auctioneer.publicKey));
-  const nftEdition = findMasterEditionPda(umi, { mint: nftMint.publicKey });
-  const nftMetadata = findMetadataPda(umi, { mint: nftMint.publicKey });
+    const mintAta = getAssociatedTokenAddressSync(toWeb3JsPublicKey(nftMint.publicKey), toWeb3JsPublicKey(auctioneer.publicKey));
+    const nftEdition = findMasterEditionPda(umi, { mint: nftMint.publicKey });
+    const nftMetadata = findMetadataPda(umi, { mint: nftMint.publicKey });
 
-  const time = Math.round(new Date().getTime() / 1000);
-  auctionStart = time + 1;
-  auctionEnd = time + 10;
-  await program.methods.createAuction(new BN(auctionStart), new BN(auctionEnd), new BN(0), new BN(0))
-    .accounts({
-      payer: auctioneer.publicKey,
-      mint: nftMint.publicKey,
-      collectionMint: collectionMint.publicKey,
-      mintAta,
-      metadata: toWeb3JsPublicKey(nftMetadata[0]),
-      edition: toWeb3JsPublicKey(nftEdition[0]),
-      auction,
-      vault,
-      vaultState,
-    })
-    .signers([web3JsAuctioneerSigner])
-    .rpc();
-});
+    const time = Math.round(new Date().getTime() / 1000);
+    auctionStart = time + 1;
+    auctionEnd = time + 10;
+    await program.methods.createAuction(new BN(auctionStart), new BN(auctionEnd), new BN(0), new BN(0))
+      .accounts({
+        payer: auctioneer.publicKey,
+        mint: nftMint.publicKey,
+        collectionMint: collectionMint.publicKey,
+        mintAta,
+        metadata: toWeb3JsPublicKey(nftMetadata[0]),
+        edition: toWeb3JsPublicKey(nftEdition[0]),
+        auction,
+        vault,
+        vaultState,
+      })
+      .signers([web3JsAuctioneerSigner])
+      .rpc();
+  });
 
-describe("Before the beginning of the auction", () => {
-  it("No bet can be made", async () => {
-    umi.use(signerIdentity(bidder1));
-    await assert.rejects(async () => {
+  describe("Before the beginning of the auction", () => {
+    it("No bet can be made", async () => {
+      umi.use(signerIdentity(bidder1));
+      await assert.rejects(async () => {
+        await program.methods.bid(new BN(1))
+          .accounts({
+            bidder: bidder1.publicKey,
+            mint: nftMint.publicKey,
+            auction,
+            vault,
+            vaultState,
+            precedingBidder: null,
+          })
+          .signers([web3JsBidder1Signer])
+          .rpc();
+      }, () => true, "Bid should fail");
+    });
+  });
+
+  describe("After the beginning of the auction", () => {
+    let balanceBefore: number;
+    before(async () => {
+      balanceBefore = await provider.connection.getBalance(vault);
+      const now = new Date().getTime();
+      await new Promise((resolve) => setTimeout(resolve, auctionStart * 1000 - now + 1500));
+    });
+
+    it("A bet can be made", async () => {
       await program.methods.bid(new BN(1))
         .accounts({
           bidder: bidder1.publicKey,
@@ -99,91 +124,67 @@ describe("Before the beginning of the auction", () => {
         })
         .signers([web3JsBidder1Signer])
         .rpc();
-    }, () => true, "Bid should fail");
-  });
-});
+    });
 
-describe("After the beginning of the auction", () => {
-  let balanceBefore: number;
-  before(async () => {
-    balanceBefore = await provider.connection.getBalance(vault);
-    const now = new Date().getTime();
-    await new Promise((resolve) => setTimeout(resolve, auctionStart * 1000 - now + 1500));
-  });
+    it("The vault balance should increase", async () => {
+      const balanceAfter = await provider.connection.getBalance(vault);
+      assert(balanceAfter > balanceBefore, "The vault balance should have increased");
+    });
 
-  it("A bet can be made", async () => {
-    await program.methods.bid(new BN(1))
-      .accounts({
-        bidder: bidder1.publicKey,
-        mint: nftMint.publicKey,
-        auction,
-        vault,
-        vaultState,
-        precedingBidder: null,
-      })
-      .signers([web3JsBidder1Signer])
-      .rpc();
-  });
-
-  it("The vault balance should increase", async () => {
-    const balanceAfter = await provider.connection.getBalance(vault);
-    assert(balanceAfter > balanceBefore, "The vault balance should have increased");
-  });
-
-  it("A bet cannot be made if its amount is lesser or equal than the current bet", async () => {
-    umi.use(signerIdentity(bidder2));
-    await assert.rejects(async () => {
-      await program.methods.bid(new BN(1))
-        .accountsPartial({
-          bidder: bidder2.publicKey,
-          mint: nftMint.publicKey,
-          auction,
-          vault,
-          vaultState,
-          precedingBidder: bidder1.publicKey,
-        })
-        .signers([web3JsBidder2Signer])
-        .rpc();
-    }, () => true, "Bid should fail");
-  });
-
-  it("A bet can be made if its amount is greater than the current bet", async () => {
+    it("A bet cannot be made if its amount is lesser or equal than the current bet", async () => {
       umi.use(signerIdentity(bidder2));
-      await program.methods.bid(new BN(2))
-        .accountsPartial({
-          bidder: bidder2.publicKey,
-          mint: nftMint.publicKey,
-          auction,
-          vault,
-          vaultState,
-          precedingBidder: toWeb3JsPublicKey(bidder1.publicKey),
-        })
-        .signers([web3JsBidder2Signer])
-        .rpc();
-  });
-});
+      await assert.rejects(async () => {
+        await program.methods.bid(new BN(1))
+          .accountsPartial({
+            bidder: bidder2.publicKey,
+            mint: nftMint.publicKey,
+            auction,
+            vault,
+            vaultState,
+            precedingBidder: bidder1.publicKey,
+          })
+          .signers([web3JsBidder2Signer])
+          .rpc();
+      }, () => true, "Bid should fail");
+    });
 
-describe("After the end of the auction", () => {
-  before(async () => {
-    const now = new Date().getTime();
-    await new Promise((resolve) => setTimeout(resolve, auctionEnd * 1000 - now + 1500));
+    it("A bet can be made if its amount is greater than the current bet", async () => {
+        umi.use(signerIdentity(bidder2));
+        await program.methods.bid(new BN(2))
+          .accountsPartial({
+            bidder: bidder2.publicKey,
+            mint: nftMint.publicKey,
+            auction,
+            vault,
+            vaultState,
+            precedingBidder: toWeb3JsPublicKey(bidder1.publicKey),
+          })
+          .signers([web3JsBidder2Signer])
+          .rpc();
+    });
   });
 
-  it("No bet can be made", async () => {
-    umi.use(signerIdentity(bidder1));
-    await assert.rejects(async () => {
-      const tx = await program.methods.bid(new BN(100))
-        .accounts({
-          bidder: bidder1.publicKey,
-          mint: nftMint.publicKey,
-          auction,
-          vault,
-          vaultState,
-          precedingBidder: bidder2.publicKey,
-        })
-        .signers([web3JsBidder1Signer])
-        .rpc();
-      console.log(tx);
-    }, () => true, "Bid should fail");
+  describe("After the end of the auction", () => {
+    before(async () => {
+      const now = new Date().getTime();
+      await new Promise((resolve) => setTimeout(resolve, auctionEnd * 1000 - now + 1500));
+    });
+
+    it("No bet can be made", async () => {
+      umi.use(signerIdentity(bidder1));
+      await assert.rejects(async () => {
+        await program.methods.bid(new BN(100))
+          .accounts({
+            bidder: bidder1.publicKey,
+            mint: nftMint.publicKey,
+            auction,
+            vault,
+            vaultState,
+            precedingBidder: bidder2.publicKey,
+          })
+          .signers([web3JsBidder1Signer])
+          .rpc();
+      }, () => true, "Bid should fail");
+    });
   });
 });
