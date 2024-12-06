@@ -141,7 +141,10 @@ describe("If a bid is made", () => {
     });
 
     it("Nobody can claim the NFT...", async () => {
-      for (const signer of [auctioneer, somebody]) {
+      for (const signer of [
+        web3JsAuctioneerSigner,
+        web3JsSomebodySigner
+      ]) {
         await assert.rejects(async () => {
           await program.methods.claimNft()
             .accounts({
@@ -154,7 +157,7 @@ describe("If a bid is made", () => {
               vault,
               vaultState,
             })
-            .signers([web3JsBidder1Signer])
+            .signers([signer])
             .rpc();
         }, () => true, "Claim should fail");
       }
