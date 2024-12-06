@@ -8,8 +8,9 @@ use anchor_spl::{
         Metadata
     }, 
     token::{
-        Mint, revoke, Revoke, Token, TokenAccount
-    }
+        Mint, revoke, Revoke, Token, TokenAccount, transfer, Transfer
+    },
+    associated_token::AssociatedToken,
 };
 
 use crate::state::{Auction, VaultState};
@@ -20,13 +21,23 @@ pub struct ClaimNFT<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
     #[account(
-        mut,
+        init_if_needed,
+        payer = signer,
         associated_token::mint = mint,
         associated_token::authority = signer,
     )]
-    pub mint_ata: Account<'info, TokenAccount>,
+    pub signer_ata: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub auctioneer: SystemAccount<'info>,
+    #[account(
+        mut,
+        associated_token::mint = mint,
+        associated_token::authority = auctioneer,
+    )]
+    pub auctioneer_ata: Account<'info, TokenAccount>,
     pub mint: Account<'info, Mint>,
     #[account(
+        mut,
         seeds = [
             b"metadata",
             metadata_program.key().as_ref(),
@@ -38,6 +49,7 @@ pub struct ClaimNFT<'info> {
     )]
     pub edition: Account<'info, MasterEditionAccount>,
     #[account(
+        mut,
         seeds = [b"auction", mint.key().as_ref()],
         bump = auction.bump,
     )]
@@ -55,12 +67,13 @@ pub struct ClaimNFT<'info> {
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
     pub metadata_program: Program<'info, Metadata>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
 impl<'info> ClaimNFT<'info> {
     pub fn claim_nft(&mut self) -> Result<()> {
-        let time_elapsed = Clock::get()?.unix_timestamp - self.auction.start_time;
-        require!(time_elapsed >= self.auction.deadline, AuctionError::AuctionNotEnded);
+        let current_time = Clock::get()?.unix_timestamp;
+        require!(current_time >= self.auction.deadline, AuctionError::AuctionNotEnded);
         match self.auction.current_bidder {
             Some(bidder) => {
                 require!(
@@ -79,10 +92,12 @@ impl<'info> ClaimNFT<'info> {
         let seeds = &[
             b"auction",
             self.mint.to_account_info().key.as_ref(),
+            &[self.auction.bump],
         ];
         let signer_seeds = &[&seeds[..]];
+
         let delegate = &self.auction.to_account_info();
-        let token_account = &self.mint_ata.to_account_info();
+        let token_account = &self.auctioneer_ata.to_account_info();
         let edition = &self.edition.to_account_info();
         let mint = &self.mint.to_account_info();
         let token_program = &self.token_program.to_account_info();
@@ -98,14 +113,27 @@ impl<'info> ClaimNFT<'info> {
             },
         ).invoke_signed(signer_seeds)?;
 
-        let cpi_ctx = CpiContext::new(
+        let cpi_ctx = CpiContext::new_with_signer(
             self.token_program.to_account_info(),
-            Revoke {
-                source: self.mint_ata.to_account_info(),
-                authority: self.signer.to_account_info(),
+            Transfer {
+                from: self.auctioneer_ata.to_account_info(),
+                to: self.signer_ata.to_account_info(),
+                authority: self.auction.to_account_info(),
             },
+            signer_seeds
         );
-        revoke(cpi_ctx)?;
+        transfer(cpi_ctx, 1)?;
+
+        // exceeds compute budget
+        //let cpi_ctx = CpiContext::new(
+            //self.token_program.to_account_info(),
+            //Revoke {
+                //source: self.auctioneer_ata.to_account_info(),
+                //authority: self.signer.to_account_info(),
+            //},
+        //);
+        //revoke(cpi_ctx)?;
+
         Ok(())
     }
 }

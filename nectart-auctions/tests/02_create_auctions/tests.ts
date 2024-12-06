@@ -2,7 +2,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import { generateSigner, KeypairSigner, signerIdentity } from "@metaplex-foundation/umi";
-import { delegateStandardV1, findMasterEditionPda, findMetadataPda, lockV1, mplTokenMetadata, TokenStandard, transferV1 } from "@metaplex-foundation/mpl-token-metadata";
+import { findMasterEditionPda, findMetadataPda, mplTokenMetadata, TokenStandard, transferV1 } from "@metaplex-foundation/mpl-token-metadata";
 import { mockStorage } from '@metaplex-foundation/umi-storage-mock';
 import { airdrop_if_needed, createNft, ONE_SECOND, ONE_MINUTE} from '../lib';
 import { NectartAuctions } from "../../target/types/nectart_auctions";
