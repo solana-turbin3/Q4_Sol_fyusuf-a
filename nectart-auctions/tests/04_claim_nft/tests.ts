@@ -1,7 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
-import { generateSigner, KeypairSigner, Pda, signerIdentity } from "@metaplex-foundation/umi";
+import { generateSigner, KeypairSigner, Pda, PublicKey, signerIdentity, Umi } from "@metaplex-foundation/umi";
 import { findMasterEditionPda, findMetadataPda, mplTokenMetadata, TokenStandard, transferV1 } from "@metaplex-foundation/mpl-token-metadata";
 import { mockStorage } from '@metaplex-foundation/umi-storage-mock';
 import { airdrop_if_needed, createNft } from '../lib';
@@ -11,6 +11,7 @@ import { toWeb3JsPublicKey } from "@metaplex-foundation/umi-web3js-adapters";
 import { Keypair } from "@solana/web3.js";
 import { BN } from "bn.js";
 import assert from "node:assert/strict";
+import { fetchToken, findAssociatedTokenPda } from "@metaplex-foundation/mpl-toolbox";
 
 const provider_ = anchor.AnchorProvider.env();
 
@@ -21,6 +22,17 @@ const provider = new anchor.AnchorProvider(
     commitment: 'confirmed',
   }
 );
+
+async function howManyTokensHasOwner(umi: Umi, owner: PublicKey<string>, mint: PublicKey<string>): Promise<bigint> {
+  try {
+    let result = findAssociatedTokenPda(umi, { owner, mint });
+    associatedToken = result[0];
+    let ata = await fetchToken(umi, associatedToken);
+    return ata.amount;
+  } catch (e) {
+    return BigInt(0);
+  }
+}
 
 const umi = createUmi(provider.connection);
 const auctioneer = generateSigner({ eddsa: umi.eddsa });
@@ -46,6 +58,7 @@ let vault: anchor.web3.PublicKey;
 let vaultState: anchor.web3.PublicKey;
 let nftEdition: Pda<string, number>;
 let auctioneerAta: anchor.web3.PublicKey;
+let associatedToken: PublicKey<string>;
 
 let auctionStart: number;
 let auctionEnd: number;
@@ -93,6 +106,9 @@ const initializeAuction = async () => {
 }
 
 describe("If a bid is made,", () => {
+  let auctioneerTokenNumberBefore: bigint;
+  let bidderTokenNumberBefore: bigint;
+
   before(async () => {
     await initializeAuction();
     await program.methods.bid(new BN(1))
@@ -164,6 +180,8 @@ describe("If a bid is made,", () => {
     });
 
     it("...except the highest bidder", async () => {
+      auctioneerTokenNumberBefore = await howManyTokensHasOwner(umi, auctioneer.publicKey, nftMint.publicKey);
+      bidderTokenNumberBefore = await howManyTokensHasOwner(umi, bidder1.publicKey, nftMint.publicKey);
       await program.methods.claimNft()
         .accounts({
           signer: bidder1.publicKey,
@@ -179,6 +197,18 @@ describe("If a bid is made,", () => {
         .rpc();
     });
 
+    it("The balance of the auctioneer is decremented", async () => {
+      const auctioneerTokenNumberAfter = await howManyTokensHasOwner(umi, auctioneer.publicKey, nftMint.publicKey);
+      assert.strictEqual(Number(auctioneerTokenNumberBefore), 1);
+      assert.strictEqual(Number(auctioneerTokenNumberAfter), 0);
+    });
+
+    it("The balance of the bidder is incremented", async () => {
+      const bidderTokenNumberAfter = await howManyTokensHasOwner(umi, bidder1.publicKey, nftMint.publicKey);
+      assert.strictEqual(Number(bidderTokenNumberBefore), 0);
+      assert.strictEqual(Number(bidderTokenNumberAfter), 1);
+    });
+
     it("After the claim, the token is not frozen", async () => {
       await (transferV1(umi, {
         mint: nftMint.publicKey,
@@ -188,10 +218,13 @@ describe("If a bid is made,", () => {
         tokenStandard: TokenStandard.NonFungible,
       }).sendAndConfirm(umi));
     });
+
   });
 });
 
 describe("If no bid is made", () => {
+  let auctioneerTokenNumberBefore: bigint;
+
   before(async () => {
     await initializeAuction();
   });
@@ -248,6 +281,7 @@ describe("If no bid is made", () => {
     });
 
     it("...except the auctioneer", async () => {
+      auctioneerTokenNumberBefore = await howManyTokensHasOwner(umi, auctioneer.publicKey, nftMint.publicKey);
       await program.methods.claimNft()
         .accounts({
           signer: auctioneer.publicKey,
@@ -261,6 +295,12 @@ describe("If no bid is made", () => {
         })
         .signers([web3JsAuctioneerSigner])
         .rpc();
+    });
+
+    it("The balance of the auctioneer is the same", async () => {
+      const auctioneerTokenNumberAfter = await howManyTokensHasOwner(umi, auctioneer.publicKey, nftMint.publicKey);
+      assert.strictEqual(Number(auctioneerTokenNumberBefore), 1);
+      assert.strictEqual(Number(auctioneerTokenNumberAfter), 1);
     });
 
     it("After the claim, the token is not frozen", async () => {
