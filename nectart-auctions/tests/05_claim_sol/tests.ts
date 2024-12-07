@@ -1,7 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
-import { generateSigner, KeypairSigner, Pda, signerIdentity } from "@metaplex-foundation/umi";
+import { generateSigner, KeypairSigner, Pda, signerIdentity, SolAmount } from "@metaplex-foundation/umi";
 import { findMasterEditionPda, findMetadataPda, mplTokenMetadata } from "@metaplex-foundation/mpl-token-metadata";
 import { mockStorage } from '@metaplex-foundation/umi-storage-mock';
 import { airdrop_if_needed, createNft } from '../lib';
@@ -49,6 +49,8 @@ let auctioneerAta: anchor.web3.PublicKey;
 
 let auctionStart: number;
 let auctionEnd: number;
+
+let balanceBefore: SolAmount;
 
 before(async () => {
   umi.use(signerIdentity(auctioneer));
@@ -158,6 +160,8 @@ describe("If a bid is made,", () => {
     });
 
     it("...except the auctioneer", async () => {
+      umi.use(signerIdentity(auctioneer));
+      balanceBefore = await umi.rpc.getBalance(auctioneer.publicKey);
       await program.methods.claimSol()
         .accounts({
           signer: web3JsAuctioneerSigner.publicKey,
@@ -168,6 +172,11 @@ describe("If a bid is made,", () => {
         })
         .signers([web3JsAuctioneerSigner])
         .rpc();
+    });
+
+    it("The auctioneer balance in SOL should increase", async () => {
+      const balanceAfter = await umi.rpc.getBalance(auctioneer.publicKey);
+      assert(Number(balanceAfter.basisPoints) - Number(balanceBefore.basisPoints) == 1, "Balance should increase");
     });
   });
 });
