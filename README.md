@@ -5,13 +5,13 @@
 ### Description
 This program allows to make an ascending auction for an NFT against SOL.
 
-## Location
+### Location
 The project is inside `./nectart-auctions` directory.
 
-## Devnet deployment
+### Devnet deployment
 The program is deployed on devnet at the following address [4zoHXad7ksVtaDgP2YqgCzx8DErSiXgDVsLBaodHpHuh](https://explorer.solana.com/address/4zoHXad7ksVtaDgP2YqgCzx8DErSiXgDVsLBaodHpHuh?cluster=devnet).
 
-## Run tests
+### Run tests
 ```bash
 anchor test
 ```
